@@ -60,9 +60,9 @@ export const StockReport: React.FC = () => {
           setErrorMsg('');
           
           try {
-              console.log(`Fetching stock for ${user.voen}`);
+           //   console.log(`Fetching stock for ${user.voen}`);
               const data = await api.reports.fetchStock(user.voen);
-              console.log('Fetched stock data:', data);
+         //     console.log('Fetched stock data:', data);
               
               if (data && data.length > 0) {
                   const firstItem = data[0];

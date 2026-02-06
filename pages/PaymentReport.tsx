@@ -45,9 +45,9 @@ export const PaymentReport: React.FC = () => {
       setCurrentPage(1);
 
       try {
-          console.log(`Searching payments for ${user.voen} from ${startDate} to ${endDate}`);
+    //      console.log(`Searching payments for ${user.voen} from ${startDate} to ${endDate}`);
           const result = await api.reports.fetchPayments(user.voen, startDate, endDate);
-          console.log('Fetched payment data:', result);
+  //        console.log('Fetched payment data:', result);
           
           if (result && result.length > 0) {
               const firstItem = result[0];

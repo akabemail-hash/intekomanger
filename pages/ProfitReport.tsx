@@ -76,9 +76,9 @@ export const ProfitReport: React.FC = () => {
       setProfitKey('');
 
       try {
-          console.log(`Searching profit for ${user.voen} from ${startDate} to ${endDate}`);
+       //   console.log(`Searching profit for ${user.voen} from ${startDate} to ${endDate}`);
           const data = await api.reports.fetchProfit(user.voen, startDate, endDate);
-          console.log('Fetched profit data:', data);
+       //   console.log('Fetched profit data:', data);
           
           if (data && data.length > 0) {
               const firstItem = data[0];

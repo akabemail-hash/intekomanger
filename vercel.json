@@ -1,1 +1,8 @@
-
+{
+  "rewrites": [
+    {
+      "source": "/view/:path*",
+      "destination": "http://31.210.36.169:5050/view/:path*"
+    }
+  ]
+}

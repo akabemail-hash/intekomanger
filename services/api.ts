@@ -212,7 +212,7 @@ export const api = {
     reports: {
         // Fetch Real Sales Data from External API (Direct Connection)
         fetchExternalSales: async (voen: string, startDate: string, endDate: string): Promise<any[]> => {
-            const targetUrl = '/api/proxy/view/payment';
+            const targetUrl = '/view/payment';
             // Ensure YYYY-MM-DD
             const payload = { 
                 voen, 
@@ -246,7 +246,7 @@ export const api = {
 
         // Fetch Sales Details for Product Analysis
         fetchSalesDetails: async (voen: string, startDate: string, endDate: string): Promise<any[]> => {
-            const targetUrl = '/api/proxy/view/salesdetail';
+            const targetUrl = '/view/salesdetail';
             const cleanStart = formatDate(startDate);
             const cleanEnd = formatDate(endDate);
 
@@ -284,7 +284,7 @@ export const api = {
 
         // Fetch Purchase Details
         fetchPurchaseDetails: async (voen: string, startDate: string, endDate: string): Promise<any[]> => {
-            const targetUrl = '/api/proxy/view/productpurchase';
+            const targetUrl = '/view/productpurchase';
             const cleanStart = formatDate(startDate);
             const cleanEnd = formatDate(endDate);
             
@@ -356,7 +356,7 @@ export const api = {
 
         // Fetch Stock Details
         fetchStock: async (voen: string): Promise<any[]> => {
-            const targetUrl = '/api/proxy/view/warehousestock';
+            const targetUrl = '/view/warehousestock';
             const payload = { voen };
             
             try {
@@ -384,7 +384,7 @@ export const api = {
 
         // Fetch Payment Details
         fetchPayments: async (voen: string, startDate: string, endDate: string): Promise<any[]> => {
-            const targetUrl = '/api/proxy/view/payment';
+            const targetUrl = '/view/payment';
             const cleanStart = formatDate(startDate);
             const cleanEnd = formatDate(endDate);
             
@@ -420,7 +420,7 @@ export const api = {
 
         // Fetch Sale Refund Details
         fetchSaleRefunds: async (voen: string, startDate: string, endDate: string): Promise<any[]> => {
-            const targetUrl = '/api/proxy/view/salerefund';
+            const targetUrl = '/view/salerefund';
             const cleanStart = formatDate(startDate);
             const cleanEnd = formatDate(endDate);
             

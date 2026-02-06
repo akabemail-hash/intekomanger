@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { Role } from '../types';
-import { Check, Shield, Plus, Edit } from 'lucide-react';
+import { Check, Shield, Plus, Edit, ChevronLeft } from 'lucide-react';
 
 export const AdminRoles: React.FC = () => {
   const { t } = useLanguage();
   const { roles, addRole, updateRole } = useAuth();
+  const navigate = useNavigate();
   
   const [newRoleName, setNewRoleName] = useState('');
   const [editingRole, setEditingRole] = useState<Role | null>(null);
@@ -64,6 +66,17 @@ export const AdminRoles: React.FC = () => {
 
   return (
     <div className="space-y-8">
+      {/* Mobile Back Button */}
+      <div className="md:hidden mb-4">
+          <button 
+              onClick={() => navigate('/')} 
+              className="flex items-center gap-2 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium p-2 -ml-2 rounded-lg active:bg-slate-100 dark:active:bg-slate-800"
+          >
+              <ChevronLeft size={20} /> 
+              {t('previous')}
+          </button>
+      </div>
+
       <h1 className="text-2xl font-bold text-slate-800 dark:text-white">{t('admin_roles')}</h1>
 
       {/* Create Role */}

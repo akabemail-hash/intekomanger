@@ -1,463 +1,407 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
-import { LOGO_URL } from '../constants';
-import { Download, FileSpreadsheet, Search, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import ExcelJS from 'exceljs';
-import { getBase64ImageFromURL } from '../utils/reportUtils';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { Banknote, TrendingUp, TrendingDown, LayoutDashboard, FileText, ShoppingCart, CreditCard, RefreshCcw, Package, Users, ChevronLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
-export const SalesReport: React.FC = () => {
-  const { t, language } = useLanguage();
-  const { user } = useAuth();
+export const Dashboard: React.FC = () => {
+  const { t } = useLanguage();
+  const { user, getPermissionsForUser } = useAuth();
+  const navigate = useNavigate();
   
-  // Filters
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [selectedProduct, setSelectedProduct] = useState('all');
-  const [selectedGroup, setSelectedGroup] = useState('all');
-
-  // Data State
-  const [rawData, setRawData] = useState<any[]>([]); 
-  const [filteredData, setFilteredData] = useState<any[]>([]); 
-  const [displayedData, setDisplayedData] = useState<any[]>([]);
-  
-  // Dynamic Columns State
-  const [columns, setColumns] = useState<string[]>([]);
-  
-  // Specific keys for logic (Filtering/Totaling)
-  const [productKey, setProductKey] = useState<string>('');
-  const [groupKey, setGroupKey] = useState<string>('');
-  const [totalKey, setTotalKey] = useState<string>('');
-  
-  // UI State
+  const [salesData, setSalesData] = useState<any[]>([]);
+  const [productStats, setProductStats] = useState<{name: string, totalQuantity: number}[]>([]);
   const [loading, setLoading] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-  const [uniqueProducts, setUniqueProducts] = useState<string[]>([]);
-  const [uniqueGroups, setUniqueGroups] = useState<string[]>([]);
 
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(20);
+  // Mobile View State: 'menu' (grid) or 'stats' (charts)
+  const [mobileView, setMobileView] = useState<'menu' | 'stats'>('menu');
+  const permissions = user ? getPermissionsForUser(user) : [];
 
-  // Helper to find key case-insensitively or exact match
-  const findKey = (obj: any, candidates: string[]): string | undefined => {
-      if (!obj) return undefined;
-      const keys = Object.keys(obj);
-      for (const candidate of candidates) {
-          if (keys.includes(candidate)) return candidate;
-          const found = keys.find(k => k.toLowerCase() === candidate.toLowerCase());
-          if (found) return found;
-      }
-      return undefined;
+  // Date Calculation (Use Local Time to avoid UTC mismatches)
+  const todayDate = new Date();
+  const year = todayDate.getFullYear();
+  const month = todayDate.getMonth(); // 0-11
+  
+  // Helper for local YYYY-MM-DD
+  const formatYMD = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   };
 
-  const handleSearch = async () => {
-      if (!startDate || !endDate || !user?.voen) {
-          alert(t('select_dates_first'));
-          return;
-      }
+  const startOfMonth = new Date(year, month, 1);
+  const endOfMonth = new Date(year, month + 1, 0); // Last day of current month
 
-      setLoading(true);
-      setHasSearched(true);
-      setErrorMsg('');
-      setCurrentPage(1);
-      
-      // Reset logic keys
-      setProductKey('');
-      setGroupKey('');
-      setTotalKey('');
+  const startOfMonthString = formatYMD(startOfMonth);
+  const todayString = formatYMD(todayDate);
+  const endOfMonthString = formatYMD(endOfMonth);
 
-      try {
-        //  console.log(`Searching sales for ${user.voen} from ${startDate} to ${endDate}`);
-          const data = await api.reports.fetchSalesDetails(user.voen, startDate, endDate);
-         //  console.log('Fetched data:', data);
-          
-          if (data && data.length > 0) {
-              // 1. Detect Columns & Keys
-              const firstItem = data[0];
-              let cols = Object.keys(firstItem);
-              
-              // Conditional Filter: Only show "Doctor" column if customer_type is "clinic"
-              if (user?.customer_type !== 'clinic') {
-                  const doctorKeywords = ['DoctorName', 'doctorName', 'doctorname', 'Doctor', 'doctor', 'HekimAdi', 'hekimadi', 'Hekim', 'hekim', 'Həkim adı', 'Həkim', 'Doktor'];
-                  cols = cols.filter(col => !doctorKeywords.some(k => k.toLowerCase() === col.toLowerCase()));
-              }
-
-              setColumns(cols);
-
-              // 2. Logic Keys
-              const pKey = findKey(firstItem, ['ProductName', 'productName', 'malinadi', 'Name']);
-              const gKey = findKey(firstItem, ['CategoryName', 'categoryName', 'ProductGroup', 'group', 'qrup']);
-              const tKey = findKey(firstItem, ['TotalAmount', 'totalAmount', 'Total', 'amount', 'mebleg']);
-
-              if (pKey) setProductKey(pKey);
-              if (gKey) setGroupKey(gKey);
-              if (tKey) setTotalKey(tKey);
-
-              // 3. Extract Uniques
-              if (pKey) {
-                  const products = Array.from(new Set(data.map((i: any) => i[pKey]))).filter(Boolean).sort() as string[];
-                  setUniqueProducts(products);
-              } else {
-                  setUniqueProducts([]);
-              }
-
-              if (gKey) {
-                  const groups = Array.from(new Set(data.map((i: any) => i[gKey]))).filter(Boolean).sort() as string[];
-                  setUniqueGroups(groups);
-              } else {
-                  setUniqueGroups([]);
-              }
-
-              setRawData(data);
-              // We do NOT set filteredData here manually anymore to avoid race conditions. 
-              // The useEffect below will handle it when rawData updates.
-          } else {
-              setRawData([]);
-              setFilteredData([]);
-              setColumns([]);
-          }
-      } catch (e: any) {
-          console.error("Failed to fetch report", e);
-          setErrorMsg(e.message || "Failed to load data");
-          setRawData([]);
-          setFilteredData([]);
-      } finally {
-          setLoading(false);
-      }
-  };
-
-  // Filter Effect - Runs when rawData or filters change
   useEffect(() => {
-      let res = [...rawData];
-
-      if (selectedProduct !== 'all' && productKey) {
-          res = res.filter(item => item[productKey] === selectedProduct);
-      }
-
-      if (selectedGroup !== 'all' && groupKey) {
-          res = res.filter(item => item[groupKey] === selectedGroup);
-      }
-
-      setFilteredData(res);
-      // We don't reset currentPage here to prevent jumping on data refresh if not needed,
-      // but usually reset is good UI practice on filter change.
-  }, [rawData, selectedProduct, selectedGroup, productKey, groupKey]);
-
-  // Pagination Effect
-  useEffect(() => {
-      const startIndex = (currentPage - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      setDisplayedData(filteredData.slice(startIndex, endIndex));
-  }, [filteredData, currentPage, itemsPerPage]);
-
-  // Sum Logic
-  const totalSalesAmount = totalKey 
-    ? filteredData.reduce((acc, curr) => acc + (Number(curr[totalKey]) || 0), 0) 
-    : 0;
-
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-
-  const translateHeader = (header: string) => {
-      const key = header.toLowerCase();
-      const translated = t(key);
-      if (translated === key) {
-          return header.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase());
-      }
-      return translated;
-  };
-
-  const formatCellValue = (header: string, value: any) => {
-      if (!value) return '';
-      if (header.toLowerCase().includes('date') || header.toLowerCase() === 'tarix') {
-          try {
-             // Handle ISO Strings specifically (remove T and Z)
-             if (typeof value === 'string' && value.includes('T')) {
-                 const d = new Date(value);
-                 if (!isNaN(d.getTime())) {
-                      return d.toLocaleDateString(language === 'en' ? 'en-US' : (language === 'tr' ? 'tr-TR' : (language === 'ru' ? 'ru-RU' : 'az-AZ'))) + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false});
-                 }
-             }
-             return String(value).split('T')[0]; // Simple fallback
-          } catch (e) {}
-      }
-      return String(value);
-  };
-
-  // --- Export Logic ---
-  const handlePdfExport = async () => {
-    if (filteredData.length === 0) return;
-    const doc = new jsPDF('l');
-
-    try {
-        const fontResponse = await fetch('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf');
-        const fontBlob = await fontResponse.blob();
-        const reader = new FileReader();
+    const fetchData = async () => {
+        if (!user?.voen) return;
         
-        reader.onloadend = async () => {
-            const base64data = reader.result?.toString().split(',')[1];
-            if (base64data) {
-                doc.addFileToVFS('Roboto-Regular.ttf', base64data);
-                doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
-                doc.setFont('Roboto');
-                await generatePdfContent(doc);
+        setLoading(true);
+
+        // 1. Fetch General Sales (Daily/Monthly Totals)
+        try {
+            console.log(`Fetching sales totals: ${startOfMonthString} to ${endOfMonthString}`);
+            // Fetch for the entire month to ensure we get all monthly data
+            const externalData = await api.reports.fetchExternalSales(user.voen, startOfMonthString, endOfMonthString);
+            
+            console.log('Processed Sales Data:', externalData);
+
+            if (externalData && Array.isArray(externalData)) {
+                setSalesData(externalData);
+            } else {
+                setSalesData([]); 
             }
-        };
-        reader.readAsDataURL(fontBlob);
-    } catch (e) {
-        console.error("Font loading failed", e);
-        await generatePdfContent(doc);
-    }
+        } catch (error) {
+            console.error("Sales Fetch Error:", error);
+            // Don't clear salesData here if possible, but for now safe to leave or set empty
+            setSalesData([]); 
+        }
+
+        // 2. Fetch Sales Details (Top/Worst Products)
+        try {
+            console.log(`Fetching details for Top 5: ${startOfMonthString} to ${endOfMonthString}`);
+            const detailsData = await api.reports.fetchSalesDetails(user.voen, startOfMonthString, endOfMonthString);
+            
+            const statsMap = new Map<string, number>();
+            
+            if (detailsData && Array.isArray(detailsData)) {
+                detailsData.forEach(item => {
+                    // Normalize keys
+                    const name = item.ProductName || item.productName || item.MalinAdi || item.Name || item.name || 'Unknown Product';
+                    // Sum quantity
+                    const qty = Number(item.Quantity || item.quantity || item.Amount || item.amount || item.Miqdar || 0);
+                    
+                    const currentQty = statsMap.get(name) || 0;
+                    statsMap.set(name, currentQty + qty);
+                });
+            }
+
+            const processedStats = Array.from(statsMap.entries()).map(([name, totalQuantity]) => ({
+                name,
+                totalQuantity
+            }));
+            
+            console.log('Processed Product Stats:', processedStats);
+            setProductStats(processedStats);
+
+        } catch (error) {
+            console.error("Details Fetch Error:", error);
+            // Do not clear salesData here, only productStats
+            setProductStats([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    fetchData();
+  }, [user?.voen]);
+
+  // --- Data Processing ---
+
+  // Helper to safely extract date from API response (Keys: TARİX, date, etc.)
+  const processDate = (item: any) => {
+      // Check for Date (capitalized), date, or local variations
+      const rawDate = String(item.Date || item.date || item.DATE || item.tarix || item.TARIX || '').trim();
+      
+      if (!rawDate || rawDate === 'undefined') return '';
+      
+      // Handle ISO string like 2026-01-26T00:00:00.000Z
+      if (rawDate.includes('T')) return rawDate.split('T')[0];
+      
+      // Handle DD.MM.YYYY
+      if (rawDate.includes('.') && rawDate.length === 10) {
+          const parts = rawDate.split('.');
+          if (parts.length === 3) {
+             return `${parts[2]}-${parts[1]}-${parts[0]}`;
+          }
+      }
+      
+      return rawDate;
   };
 
-  const generatePdfContent = async (doc: jsPDF) => {
-    const logoData = await getBase64ImageFromURL(LOGO_URL);
-    if (logoData) {
-        doc.addImage(logoData, 'PNG', 14, 10, 30, 10); 
-    } else {
-        doc.setFontSize(18); doc.text("INTEKO", 14, 20);
-    }
-    
-    doc.setFontSize(14); doc.text(t('sales_report'), 14, 30);
-    doc.setFontSize(10); doc.text(`${t('generated_date')}: ${new Date().toLocaleDateString()}`, 14, 36);
+  // Helper to sum a specific column across data array
+  const sumColumn = (data: any[], key: string) => {
+      return data.reduce((acc, item) => {
+          // Robust key checking: exact, Title Case, UPPER CASE, lower case
+          const titleCaseKey = key.charAt(0).toUpperCase() + key.slice(1);
+          
+          let val = item[key] 
+                 || item[titleCaseKey]      // e.g. 'Cash'
+                 || item[key.toUpperCase()] // e.g. 'CASH'
+                 || item[key.toLowerCase()]; // e.g. 'cash'
+          
+          // Fallback for Credit/Nisye synonyms
+          if (key === 'credit' && (val === undefined || val === null)) {
+              val = item['Nisye'] || item['NISYE'] || item['Credit'] || item['CREDIT'];
+          }
 
-    const headers = columns.map(c => translateHeader(c));
-    const tableBody = filteredData.map(row => columns.map(col => formatCellValue(col, row[col])));
-
-    autoTable(doc, {
-        startY: 45,
-        head: [headers],
-        body: tableBody,
-        theme: 'striped',
-        styles: { font: 'Roboto', fontStyle: 'normal', fontSize: 8 },
-        headStyles: { fillColor: [37, 99, 235], font: 'Roboto' }
-    });
-
-    doc.save(`sales_report_${new Date().toISOString().split('T')[0]}.pdf`);
+          // Handle potential string formatting '120,50'
+          if (typeof val === 'string') {
+             val = val.replace(/\s/g, '').replace(',', '.');
+          }
+          return acc + (Number(val) || 0);
+      }, 0);
   };
 
-  const handleExcelExport = async () => {
-    if (filteredData.length === 0) return;
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Sales Report');
+  // 1. Daily Stats (Today)
+  const dailySalesData = salesData.filter(s => processDate(s) === todayString);
+  
+  const dailyCash = sumColumn(dailySalesData, 'cash');
+  const dailyCard = sumColumn(dailySalesData, 'card');
+  const dailyBank = sumColumn(dailySalesData, 'bank');
+  const dailyNisye = sumColumn(dailySalesData, 'credit');
 
-    const logoDataUrl = await getBase64ImageFromURL(LOGO_URL);
-    if (logoDataUrl) {
-        const logoId = workbook.addImage({ base64: logoDataUrl, extension: 'png' });
-        worksheet.addImage(logoId, { tl: { col: 0, row: 0 }, ext: { width: 120, height: 40 } });
-    } else {
-        worksheet.getCell('A1').value = "INTEKO";
-    }
+  // 2. Monthly Stats (Current Month - based on all fetched data)
+  const monthlyCash = sumColumn(salesData, 'cash');
+  const monthlyCard = sumColumn(salesData, 'card');
+  const monthlyBank = sumColumn(salesData, 'bank');
+  const monthlyNisye = sumColumn(salesData, 'credit');
 
-    worksheet.mergeCells('A4:F4');
-    worksheet.getCell('A4').value = t('sales_report');
-    worksheet.getCell('A4').font = { size: 16, bold: true };
-    
-    const headerRow = worksheet.getRow(7);
-    headerRow.values = columns.map(c => translateHeader(c));
-    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    headerRow.eachCell((cell) => {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
-    });
-    
-    filteredData.forEach((row) => {
-        const rowValues = columns.map(col => formatCellValue(col, row[col]));
-        worksheet.addRow(rowValues);
-    });
+  // 3. Top / Worst Products Logic (Real Data)
+  const top5 = [...productStats].sort((a, b) => b.totalQuantity - a.totalQuantity).slice(0, 5);
+  
+  const worst5 = [...productStats]
+                    .filter(p => p.totalQuantity >= 0) 
+                    .sort((a, b) => a.totalQuantity - b.totalQuantity)
+                    .slice(0, 5);
 
-    worksheet.columns = columns.map(() => ({ width: 15 }));
+  const dataDaily = [
+    { name: t('cash'), value: dailyCash, color: '#10B981' },
+    { name: t('card'), value: dailyCard, color: '#3B82F6' },
+    { name: t('bank'), value: dailyBank, color: '#F59E0B' },
+    { name: t('nisye'), value: dailyNisye, color: '#EF4444' },
+  ];
 
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `sales_report_${new Date().toISOString().split('T')[0]}.xlsx`;
-    a.click();
-  };
+  const dataMonthly = [
+    { name: t('cash'), value: monthlyCash },
+    { name: t('card'), value: monthlyCard },
+    { name: t('bank'), value: monthlyBank },
+    { name: t('nisye'), value: monthlyNisye },
+  ];
+
+  const CardKPI = ({ title, cash, card, bank, nisye, icon: Icon }: any) => (
+    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200">{title}</h3>
+        <Icon className="text-slate-400" />
+      </div>
+      <div className="grid grid-cols-2 gap-y-4 gap-x-2">
+         <div className="border-r border-slate-100 dark:border-slate-700 pr-2">
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">{t('cash')}</p>
+            <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 truncate">
+                {loading ? '...' : `₼${cash.toLocaleString()}`}
+            </p>
+         </div>
+         <div className="pl-2">
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">{t('card')}</p>
+            <p className="text-xl font-bold text-blue-600 dark:text-blue-400 truncate">
+                {loading ? '...' : `₼${card.toLocaleString()}`}
+            </p>
+         </div>
+         <div className="border-r border-slate-100 dark:border-slate-700 pr-2 border-t pt-2">
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">{t('bank')}</p>
+            <p className="text-xl font-bold text-amber-500 dark:text-amber-400 truncate">
+                {loading ? '...' : `₼${bank.toLocaleString()}`}
+            </p>
+         </div>
+         <div className="pl-2 border-t border-slate-100 dark:border-slate-700 pt-2">
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">{t('nisye')}</p>
+            <p className="text-xl font-bold text-red-500 dark:text-red-400 truncate">
+                {loading ? '...' : `₼${nisye.toLocaleString()}`}
+            </p>
+         </div>
+      </div>
+    </div>
+  );
+
+  // --- Mobile Menu Configuration ---
+  const menuItems = [
+    { key: 'dashboard', label: t('dashboard'), icon: LayoutDashboard, color: 'bg-blue-500', link: null, action: () => setMobileView('stats') },
+    { key: 'sales', label: t('sales_report'), icon: FileText, color: 'bg-emerald-500', link: '/sales' },
+    { key: 'purchases', label: t('purchase_report'), icon: ShoppingCart, color: 'bg-amber-500', link: '/purchases' },
+    { key: 'profit', label: t('profit_report'), icon: TrendingUp, color: 'bg-violet-500', link: '/profit' },
+    { key: 'payments', label: t('payment_report'), icon: CreditCard, color: 'bg-cyan-500', link: '/payments' },
+    { key: 'sale_refund', label: t('sale_refund_report'), icon: RefreshCcw, color: 'bg-rose-500', link: '/sale-refund' },
+    { key: 'stock', label: t('stock_report'), icon: Package, color: 'bg-indigo-500', link: '/stock' },
+    { key: 'admin_users', label: t('admin_panel'), icon: Users, color: 'bg-slate-600', link: '/admin', customCheck: () => permissions.some(p => p.startsWith('admin_')) },
+  ];
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h1 className="text-2xl font-bold text-slate-800 dark:text-white">{t('sales_report')}</h1>
-          
-          {filteredData.length > 0 && (
-            <div className="flex gap-2">
-                <button 
-                    onClick={handleExcelExport}
-                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-                >
-                    <FileSpreadsheet size={18} /> Excel
-                </button>
-                <button 
-                    onClick={handlePdfExport}
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-                >
-                    <Download size={18} /> PDF
-                </button>
-            </div>
-          )}
-      </div>
+      
+      {/* Mobile Menu Grid (Visible only on mobile AND menu view) */}
+      <div className={`md:hidden ${mobileView === 'menu' ? 'block' : 'hidden'} animate-in fade-in`}>
+          <div className="grid grid-cols-3 gap-4">
+             {menuItems.map(item => {
+                // Check permissions
+                if (item.key !== 'dashboard' && item.key !== 'admin_users' && !permissions.includes(item.key)) return null;
+                if (item.customCheck && !item.customCheck()) return null;
 
-      <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t('start_date')}</label>
-              <input 
-                type="date" 
-                className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-white p-2 text-sm"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t('end_date')}</label>
-              <input 
-                type="date" 
-                className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-white p-2 text-sm"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
-            </div>
-            
-            <div>
-                <button 
-                    onClick={handleSearch}
-                    disabled={loading}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 h-[38px]"
-                >
-                    {loading ? (
-                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    ) : (
-                        <>
-                            <Search size={16} />
-                            {t('get_report')}
-                        </>
-                    )}
-                </button>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t('product')}</label>
-              <select 
-                className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-white p-2 text-sm disabled:opacity-50"
-                value={selectedProduct}
-                onChange={(e) => setSelectedProduct(e.target.value)}
-                disabled={!hasSearched || rawData.length === 0 || !productKey}
-              >
-                <option value="all">{t('all_products')}</option>
-                {uniqueProducts.map(p => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t('group')}</label>
-              <select 
-                className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-white p-2 text-sm disabled:opacity-50"
-                value={selectedGroup}
-                onChange={(e) => setSelectedGroup(e.target.value)}
-                disabled={!hasSearched || rawData.length === 0 || !groupKey}
-              >
-                <option value="all">{t('all_groups')}</option>
-                {uniqueGroups.map(g => (
-                  <option key={g} value={g}>{g}</option>
-                ))}
-              </select>
-            </div>
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => {
+                        if (item.action) item.action();
+                        else if (item.link) navigate(item.link);
+                    }}
+                    className="flex flex-col items-center justify-center p-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 active:scale-95 transition-transform h-32"
+                  >
+                     <div className={`${item.color} text-white p-3 rounded-xl mb-3 shadow-md`}>
+                        <item.icon size={28} />
+                     </div>
+                     <span className="text-xs font-semibold text-center text-slate-700 dark:text-slate-200 leading-tight">
+                        {item.label}
+                     </span>
+                  </button>
+                )
+             })}
           </div>
       </div>
 
-      {errorMsg && (
-          <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 p-4 rounded-xl flex items-center gap-3">
-              <AlertCircle size={20} />
-              <span>{errorMsg}</span>
-          </div>
-      )}
+      {/* Stats View (Visible on Desktop OR when toggled on Mobile) */}
+      <div className={`md:block ${mobileView === 'stats' ? 'block' : 'hidden'}`}>
+        
+        {/* Mobile Back Button */}
+        <div className="md:hidden mb-4">
+            <button 
+                onClick={() => setMobileView('menu')} 
+                className="flex items-center gap-2 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium p-2 -ml-2 rounded-lg active:bg-slate-100 dark:active:bg-slate-800"
+            >
+                <ChevronLeft size={20} /> 
+                {t('previous')}
+            </button>
+        </div>
 
-      {!hasSearched ? (
-           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 p-12 text-center">
-               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-50 dark:bg-blue-900/20 mb-4">
-                   <Search className="text-blue-500" size={32} />
-               </div>
-               <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">{t('sales_report')}</h3>
-               <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-                   {t('select_dates_first')}
-               </p>
-           </div>
-      ) : (
-        <>
-            {totalKey && (
-                <div className="bg-blue-600 text-white p-4 rounded-xl shadow-md flex justify-between items-center animate-in fade-in slide-in-from-top-4">
-                    <span className="font-medium text-blue-100">{t('total')}:</span>
-                    <span className="text-2xl font-bold">₼{totalSalesAmount.toLocaleString()}</span>
-                </div>
-            )}
+        <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-bold text-slate-800 dark:text-white">{t('dashboard')}</h1>
+            <div className="text-xs text-slate-400 font-mono hidden md:block">
+                {/* Debug info */}
+                API Sync: {user?.voen} | {startOfMonthString} - {endOfMonthString}
+            </div>
+        </div>
+        
+        {/* Sales KPI Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+            <CardKPI 
+                title={t('daily_sales')} 
+                cash={dailyCash} 
+                card={dailyCard} 
+                bank={dailyBank}
+                nisye={dailyNisye}
+                icon={TrendingUp} 
+            />
+            <CardKPI 
+                title={t('monthly_sales')} 
+                cash={monthlyCash} 
+                card={monthlyCard} 
+                bank={monthlyBank}
+                nisye={monthlyNisye}
+                icon={Banknote} 
+            />
+        </div>
 
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
-                <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left text-slate-600 dark:text-slate-300">
-                    <thead className="text-xs text-slate-700 dark:text-slate-400 uppercase bg-slate-50 dark:bg-slate-700/50">
-                    <tr>
-                        {columns.length > 0 ? columns.map((col, idx) => (
-                            <th key={idx} className="px-6 py-3 whitespace-nowrap">
-                                {translateHeader(col)}
-                            </th>
-                        )) : (
-                           <th className="px-6 py-3">{t('no_records')}</th>
-                        )}
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {displayedData.map((row, rIdx) => (
-                        <tr key={rIdx} className="bg-white dark:bg-slate-800 border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700">
-                            {columns.map((col, cIdx) => (
-                                <td key={`${rIdx}-${cIdx}`} className="px-6 py-4 whitespace-nowrap">
-                                    {formatCellValue(col, row[col])}
-                                </td>
-                            ))}
-                        </tr>
+        {/* Visual Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 h-80">
+            <h3 className="text-lg font-semibold mb-4 text-slate-700 dark:text-slate-200">{t('daily_sales')}</h3>
+            {(dailyCash + dailyCard + dailyBank + dailyNisye) === 0 && !loading ? (
+                <div className="h-full flex items-center justify-center text-slate-400 text-sm">No sales data for today</div>
+            ) : (
+            <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                <Pie
+                    data={dataDaily}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    paddingAngle={5}
+                    dataKey="value"
+                >
+                    {dataDaily.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
-                    {displayedData.length === 0 && (
-                        <tr>
-                        <td colSpan={columns.length || 1} className="px-6 py-12 text-center text-slate-400">
-                            {t('no_records')}
-                        </td>
-                        </tr>
-                    )}
-                    </tbody>
-                </table>
-                </div>
-
-                {filteredData.length > 0 && (
-                    <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 dark:border-slate-700">
-                        <div className="text-sm text-slate-500 dark:text-slate-400">
-                            {t('page')} <span className="font-semibold text-slate-900 dark:text-white">{currentPage}</span> {t('of')} <span className="font-semibold text-slate-900 dark:text-white">{totalPages}</span>
-                        </div>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                                disabled={currentPage === 1}
-                                className="p-2 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-slate-600 dark:text-slate-300"
-                            >
-                                <ChevronLeft size={16} />
-                            </button>
-                            <button
-                                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                                disabled={currentPage === totalPages}
-                                className="p-2 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-slate-600 dark:text-slate-300"
-                            >
-                                <ChevronRight size={16} />
-                            </button>
-                        </div>
-                    </div>
-                )}
+                </Pie>
+                <Tooltip formatter={(value) => `₼${Number(value).toLocaleString()}`} contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f1f5f9' }} />
+                <Legend />
+                </PieChart>
+            </ResponsiveContainer>
+            )}
             </div>
-        </>
-      )}
+
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 h-80">
+                <h3 className="text-lg font-semibold mb-4 text-slate-700 dark:text-slate-200">{t('monthly_sales')}</h3>
+                <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={dataMonthly}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
+                    <XAxis dataKey="name" tick={{fill: '#94a3b8'}} />
+                    <YAxis tick={{fill: '#94a3b8'}} />
+                    <Tooltip formatter={(value) => `₼${Number(value).toLocaleString()}`} contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f1f5f9' }} />
+                    <Bar dataKey="value" fill="#6366f1" radius={[4, 4, 0, 0]}>
+                        {dataMonthly.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={
+                                index === 0 ? '#10B981' : // Cash
+                                index === 1 ? '#3B82F6' : // Card
+                                index === 2 ? '#F59E0B' : // Bank
+                                '#EF4444' // Nisye
+                            } />
+                        ))}
+                    </Bar>
+                </BarChart>
+                </ResponsiveContainer>
+            </div>
+        </div>
+
+        {/* Top/Worst Lists */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            {/* Top 5 */}
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
+            <div className="flex items-center gap-2 mb-4">
+                <TrendingUp className="text-green-500" size={20} />
+                <h3 className="font-semibold text-slate-700 dark:text-slate-200">{t('top_products')}</h3>
+            </div>
+            <div className="space-y-3">
+                {loading ? <p className="text-sm text-slate-400">Loading...</p> : top5.map((p, i) => (
+                <div key={i} className="flex justify-between items-center text-sm border-b border-slate-50 dark:border-slate-700 pb-2 last:border-0">
+                    <span className="flex-1 font-medium text-slate-600 dark:text-slate-300 truncate mr-2">{i+1}. {p.name}</span>
+                    <span className="font-bold text-slate-800 dark:text-white text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full">
+                        {Number(Number(p.totalQuantity).toFixed(2))} {t('quantity')}
+                    </span>
+                </div>
+                ))}
+                {!loading && top5.length === 0 && <p className="text-sm text-slate-400 italic">No sales data found.</p>}
+            </div>
+            </div>
+
+            {/* Worst 5 */}
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
+                <div className="flex items-center gap-2 mb-4">
+                <TrendingDown className="text-red-500" size={20} />
+                <h3 className="font-semibold text-slate-700 dark:text-slate-200">{t('worst_products')}</h3>
+            </div>
+            <div className="space-y-3">
+                {loading ? <p className="text-sm text-slate-400">Loading...</p> : worst5.map((p, i) => (
+                <div key={i} className="flex justify-between items-center text-sm border-b border-slate-50 dark:border-slate-700 pb-2 last:border-0">
+                    <span className="flex-1 font-medium text-slate-600 dark:text-slate-300 truncate mr-2">{i+1}. {p.name}</span>
+                    <span className="font-bold text-slate-800 dark:text-white text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-2 py-0.5 rounded-full">
+                        {Number(Number(p.totalQuantity).toFixed(2))} {t('quantity')}
+                    </span>
+                </div>
+                ))}
+                {!loading && worst5.length === 0 && <p className="text-sm text-slate-400 italic">No sales data found.</p>}
+            </div>
+            </div>
+        </div>
+      </div>
+
     </div>
   );
 };

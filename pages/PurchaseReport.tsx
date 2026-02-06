@@ -72,9 +72,9 @@ export const PurchaseReport: React.FC = () => {
       setTotalKey('');
 
       try {
-          console.log(`Searching purchases for ${user.voen} from ${startDate} to ${endDate}`);
+     //     console.log(`Searching purchases for ${user.voen} from ${startDate} to ${endDate}`);
           const data = await api.reports.fetchPurchaseDetails(user.voen, startDate, endDate);
-          console.log('Fetched purchase data:', data);
+     //     console.log('Fetched purchase data:', data);
           
           if (data && data.length > 0) {
               const firstItem = data[0];

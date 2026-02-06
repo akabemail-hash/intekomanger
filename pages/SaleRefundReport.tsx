@@ -72,9 +72,9 @@ export const SaleRefundReport: React.FC = () => {
       setRefundAmountKey('');
 
       try {
-          console.log(`Searching sale refunds for ${user.voen} from ${startDate} to ${endDate}`);
+        //  console.log(`Searching sale refunds for ${user.voen} from ${startDate} to ${endDate}`);
           const data = await api.reports.fetchSaleRefunds(user.voen, startDate, endDate);
-          console.log('Fetched refund data:', data);
+    //      console.log('Fetched refund data:', data);
           
           if (data && data.length > 0) {
               const firstItem = data[0];

@@ -216,8 +216,8 @@ export const api = {
             // Ensure YYYY-MM-DD
             const payload = { 
                 voen, 
-                startDate: formatDate(startDate), 
-                endDate: formatDate(endDate) 
+                StartDate: formatDate(startDate), 
+                EndDate: formatDate(endDate) 
             };
             
             try {

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { User } from '../types';
-import { Check, UserPlus, Lock, Edit, X } from 'lucide-react';
+import { Check, UserPlus, Lock, Edit, X, ChevronLeft } from 'lucide-react';
 
 export const AdminUsers: React.FC = () => {
   const { t } = useLanguage();
   const { users, addUser, updateUser, roles, user: currentUser } = useAuth();
+  const navigate = useNavigate();
   
   // Create State
   const [newUsername, setNewUsername] = useState('');
@@ -77,6 +79,17 @@ export const AdminUsers: React.FC = () => {
 
   return (
     <div className="space-y-8">
+      {/* Mobile Back Button */}
+      <div className="md:hidden mb-4">
+          <button 
+              onClick={() => navigate('/')} 
+              className="flex items-center gap-2 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium p-2 -ml-2 rounded-lg active:bg-slate-100 dark:active:bg-slate-800"
+          >
+              <ChevronLeft size={20} /> 
+              {t('previous')}
+          </button>
+      </div>
+
       <h1 className="text-2xl font-bold text-slate-800 dark:text-white">{t('admin_users')}</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

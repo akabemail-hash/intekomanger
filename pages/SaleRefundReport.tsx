@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
@@ -12,6 +13,7 @@ import { getBase64ImageFromURL } from '../utils/reportUtils';
 export const SaleRefundReport: React.FC = () => {
   const { t, language } = useLanguage();
   const { user } = useAuth();
+  const navigate = useNavigate();
   
   // Filters
   const [startDate, setStartDate] = useState('');
@@ -72,9 +74,9 @@ export const SaleRefundReport: React.FC = () => {
       setRefundAmountKey('');
 
       try {
-        //  console.log(`Searching sale refunds for ${user.voen} from ${startDate} to ${endDate}`);
+          console.log(`Searching sale refunds for ${user.voen} from ${startDate} to ${endDate}`);
           const data = await api.reports.fetchSaleRefunds(user.voen, startDate, endDate);
-    //      console.log('Fetched refund data:', data);
+          console.log('Fetched refund data:', data);
           
           if (data && data.length > 0) {
               const firstItem = data[0];
@@ -261,6 +263,17 @@ export const SaleRefundReport: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Mobile Back Button */}
+      <div className="md:hidden mb-4">
+          <button 
+              onClick={() => navigate('/')} 
+              className="flex items-center gap-2 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium p-2 -ml-2 rounded-lg active:bg-slate-100 dark:active:bg-slate-800"
+          >
+              <ChevronLeft size={20} /> 
+              {t('previous')}
+          </button>
+      </div>
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h1 className="text-2xl font-bold text-slate-800 dark:text-white">{t('sale_refund_report')}</h1>
           {filteredData.length > 0 && (

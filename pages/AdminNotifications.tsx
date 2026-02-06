@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
-import { Send, Users, User, Layers, Check } from 'lucide-react';
+import { Send, Users, User, Layers, Check, ChevronLeft } from 'lucide-react';
 
 export const AdminNotifications: React.FC = () => {
   const { t } = useLanguage();
   const { users, roles } = useAuth();
   const { sendNotification } = useNotifications();
+  const navigate = useNavigate();
   
   const [message, setMessage] = useState('');
   const [targetType, setTargetType] = useState<'all' | 'role' | 'users'>('all');
@@ -39,6 +41,17 @@ export const AdminNotifications: React.FC = () => {
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
+      {/* Mobile Back Button */}
+      <div className="md:hidden mb-4">
+          <button 
+              onClick={() => navigate('/')} 
+              className="flex items-center gap-2 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium p-2 -ml-2 rounded-lg active:bg-slate-100 dark:active:bg-slate-800"
+          >
+              <ChevronLeft size={20} /> 
+              {t('previous')}
+          </button>
+      </div>
+
       <h1 className="text-2xl font-bold text-slate-800 dark:text-white">{t('admin_notifications')}</h1>
 
       <div className="bg-white dark:bg-slate-800 p-8 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">

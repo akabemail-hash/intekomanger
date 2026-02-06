@@ -41,11 +41,11 @@ export const Dashboard: React.FC = () => {
 
         // 1. Fetch General Sales (Daily/Monthly Totals)
         try {
-            console.log(`Fetching sales totals: ${startOfMonthString} to ${endOfMonthString}`);
+        //    console.log(`Fetching sales totals: ${startOfMonthString} to ${endOfMonthString}`);
             // Fetch for the entire month to ensure we get all monthly data
             const externalData = await api.reports.fetchExternalSales(user.voen, startOfMonthString, endOfMonthString);
             
-            console.log('Processed Sales Data:', externalData);
+       //     console.log('Processed Sales Data:', externalData);
 
             if (externalData && Array.isArray(externalData)) {
                 setSalesData(externalData);

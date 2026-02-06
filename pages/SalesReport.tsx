@@ -72,9 +72,9 @@ export const SalesReport: React.FC = () => {
       setTotalKey('');
 
       try {
-          console.log(`Searching sales for ${user.voen} from ${startDate} to ${endDate}`);
+        //  console.log(`Searching sales for ${user.voen} from ${startDate} to ${endDate}`);
           const data = await api.reports.fetchSalesDetails(user.voen, startDate, endDate);
-          console.log('Fetched data:', data);
+         //  console.log('Fetched data:', data);
           
           if (data && data.length > 0) {
               // 1. Detect Columns & Keys

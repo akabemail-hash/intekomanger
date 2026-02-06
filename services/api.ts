@@ -216,8 +216,8 @@ export const api = {
             // Ensure YYYY-MM-DD
             const payload = { 
                 voen, 
-                startdate: formatDate(startDate), 
-                enddate: formatDate(endDate) 
+                startDate: formatDate(startDate), 
+                endDate: formatDate(endDate) 
             };
             
             try {
@@ -254,10 +254,9 @@ export const api = {
             // Including PascalCase variants to robustly handle API expectations
             const payload = { 
                 voen, 
-                startdate: cleanStart, 
-                enddate: cleanEnd,
-                StartDate: cleanStart,
-                EndDate: cleanEnd
+               
+                startDate: cleanStart,
+                endDate: cleanEnd
             };
             
             try {
@@ -291,10 +290,9 @@ export const api = {
             
             const payload = { 
                 voen, 
-                startdate: cleanStart, 
-                enddate: cleanEnd,
-                StartDate: cleanStart,
-                EndDate: cleanEnd
+               
+                startDate: cleanStart,
+                endDate: cleanEnd
             };
             
             try {
@@ -328,10 +326,9 @@ export const api = {
             
             const payload = { 
                 voen, 
-                startdate: cleanStart, 
-                enddate: cleanEnd,
-                StartDate: cleanStart,
-                EndDate: cleanEnd
+                 
+                startDate: cleanStart,
+                endDate: cleanEnd
             };
             
             try {
@@ -393,10 +390,9 @@ export const api = {
             
             const payload = { 
                 voen, 
-                startdate: cleanStart, 
-                enddate: cleanEnd,
-                StartDate: cleanStart,
-                EndDate: cleanEnd
+                
+                startDate: cleanStart,
+                endDate: cleanEnd
             };
             
             try {
@@ -430,10 +426,9 @@ export const api = {
             
             const payload = { 
                 voen, 
-                startdate: cleanStart, 
-                enddate: cleanEnd,
-                StartDate: cleanStart,
-                EndDate: cleanEnd
+                
+                startDate: cleanStart,
+                endDate: cleanEnd
             };
             
             try {
